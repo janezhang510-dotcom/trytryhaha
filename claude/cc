@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# cc 命令包装器，用于 Claude Code CLI
+
+case "$1" in
+    switch)
+        # 执行模型切换功能
+        ~/Documents/TRAE/claude/cc-switch.sh
+        ;;
+    *)
+        # 其他参数直接传递给 claude 命令
+        claude --dangerously-skip-permissions "$@"
+        ;;
+esac

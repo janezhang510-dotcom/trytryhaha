@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中式圣诞 2026 | Chinese Christmas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            overflow: hidden;
+            color: #0f0;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 255, 0, 0.03) 0px,
+                transparent 2px,
+                transparent 4px
+            );
+            pointer-events: none;
+            animation: scan 8s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(20px); }
+        }
+
+        .glitch {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.02);
+            opacity: 0;
+            animation: glitch 3s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes glitch {
+            0%, 90%, 100% { opacity: 0; }
+            92%, 94%, 96% { opacity: 1; }
+        }
+
+        .input-container {
+            position: fixed;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: all;
+            z-index: 20;
+            text-align: center;
+        }
+
+        .input-label {
+            color: #0ff;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #0ff;
+            letter-spacing: 2px;
+        }
+
+        #textInput {
+            background: rgba(0, 20, 20, 0.8);
+            border: 2px solid #0ff;
+            color: #0ff;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            width: 400px;
+            text-align: center;
+            outline: none;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            pointer-events: all;
+        }
+
+        #textInput::placeholder {
+            color: rgba(0, 255, 255, 0.5);
+        }
+
+        .info-panel {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            color: #0f0;
+            font-size: 12px;
+            text-shadow: 0 0 10px #0f0;
+            pointer-events: none;
+            z-index: 20;
+            line-height: 1.8;
+        }
+
+        .title {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            color: #f0f;
+            font-size: 24px;
+            text-shadow: 0 0 20px #f0f;
+            pointer-events: none;
+            z-index: 20;
+            letter-spacing: 3px;
+        }
+
+        .particle-text {
+            position: fixed;
+            color: #ff0;
+            font-size: 20px;
+            pointer-events: none;
+            z-index: 15;
+            text-shadow: 0 0 10px #ff0;
+            animation: float-up 3s ease-out forwards;
+        }
+
+        @keyframes float-up {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-200px) scale(0.5);
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="ui-overlay">
+        <div class="scanlines"></div>
+        <div class="glitch"></div>
+    </div>
+
+    <div class="info-panel">
+        <div>系统时间 | SYSTEM TIME</div>
+        <div id="time">2026-01-13 00:00:00</div>
+        <div style="margin-top: 10px;">粒子数 | PARTICLES: <span id="particleCount">0</span></div>
+        <div>输入字符 | INPUT CHARS: <span id="charCount">0</span></div>
+    </div>
+
+    <div class="title">中式圣诞 2026</div>
+
+    <div class="input-container">
+        <div class="input-label">输入英文字母与圣诞树互动 | ENTER ENGLISH LETTERS TO INTERACT</div>
+        <input type="text" id="textInput" placeholder="仅支持英文字母 | English letters only">
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.position.z = 18;
+        camera.position.y = 0;
+
+        // Particle system for Christmas tree
+        const particleCount = 2000;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const velocities = [];
+        const originalPositions = [];
+
+        // Create Christmas tree shape
+        for (let i = 0; i < particleCount; i++) {
+            const t = i / particleCount;
+            const height = t * 12 - 6;
+            const radius = (1 - t) * 4 + Math.sin(t * 20) * 0.3;
+            const angle = t * Math.PI * 20 + Math.random() * 0.5;
+
+            const x = Math.cos(angle) * radius + (Math.random() - 0.5) * 0.5;
+            const y = height;
+            const z = Math.sin(angle) * radius + (Math.random() - 0.5) * 0.5;
+
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
+
+            originalPositions.push({ x, y, z });
+            velocities.push({ x: 0, y: 0, z: 0 });
+
+            // Color gradient
+            const hue = t * 0.3 + 0.3;
+            colors[i * 3] = Math.sin(hue * Math.PI * 2) * 0.5 + 0.5;
+            colors[i * 3 + 1] = Math.sin((hue + 0.33) * Math.PI * 2) * 0.5 + 0.5;
+            colors[i * 3 + 2] = Math.sin((hue + 0.66) * Math.PI * 2) * 0.5 + 0.5;
+        }
+
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.15,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particleSystem = new THREE.Points(particles, particleMaterial);
+        scene.add(particleSystem);
+
+        // Lines connecting particles
+        const lineGeometry = new THREE.BufferGeometry();
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.2,
+            blending: THREE.AdditiveBlending
+        });
+
+        // Star on top
+        const starGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const starMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.9
+        });
+        const star = new THREE.Mesh(starGeometry, starMaterial);
+        star.position.y = 6.5;
+        scene.add(star);
+
+        // Text particles system
+        const textParticles = [];
+
+        function createTextParticle(char) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#ffff00';
+            ctx.font = 'bold 80px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#ffff00';
+            ctx.shadowBlur = 20;
+            ctx.fillText(char, 64, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                blending: THREE.AdditiveBlending
+            });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(2, 2, 1);
+
+            // Position at tree center with slight randomness
+            sprite.position.set(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+            );
+
+            // Random velocity for explosion
+            const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 0.8
+            );
+
+            scene.add(sprite);
+            textParticles.push({ sprite, velocity, life: 1.0 });
+        }
+
+        // Animation variables
+        let time = 0;
+        let interactionForce = 0;
+        let rotationSpeed = 0.002;
+
+        // Update time display
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(/\//g, '-');
+            document.getElementById('time').textContent = timeStr;
+            document.getElementById('particleCount').textContent = particleCount;
+        }
+
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Text input interaction
+        const textInput = document.getElementById('textInput');
+        const charCountEl = document.getElementById('charCount');
+
+        textInput.addEventListener('input', (e) => {
+            const text = e.target.value;
+            charCountEl.textContent = text.length;
+
+            if (text.length > 0) {
+                const lastChar = text[text.length - 1];
+
+                // Create text particle for the new character
+                createTextParticle(lastChar);
+
+                // Strong explosion force
+                interactionForce = 15;
+                rotationSpeed = 0.002 + text.length * 0.001;
+
+                // Explode all particles outward from center
+                for (let i = 0; i < particleCount; i++) {
+                    const dx = positions[i * 3];
+                    const dy = positions[i * 3 + 1];
+                    const dz = positions[i * 3 + 2];
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.1;
+
+                    const explosionForce = interactionForce / dist;
+                    velocities[i].x += (dx / dist) * explosionForce * 0.3;
+                    velocities[i].y += (dy / dist) * explosionForce * 0.3;
+                    velocities[i].z += (dz / dist) * explosionForce * 0.3;
+                }
+
+                // Change colors based on input
+                const colorShift = text.length * 0.1;
+                for (let i = 0; i < particleCount; i++) {
+                    const t = i / particleCount;
+                    const hue = t * 0.3 + 0.3 + colorShift;
+                    colors[i * 3] = Math.sin(hue * Math.PI * 2) * 0.5 + 0.5;
+                    colors[i * 3 + 1] = Math.sin((hue + 0.33) * Math.PI * 2) * 0.5 + 0.5;
+                    colors[i * 3 + 2] = Math.sin((hue + 0.66) * Math.PI * 2) * 0.5 + 0.5;
+                }
+                particles.attributes.color.needsUpdate = true;
+            }
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Rotate tree
+            particleSystem.rotation.y += rotationSpeed;
+
+            // Update particle positions
+            for (let i = 0; i < particleCount; i++) {
+                // Apply velocities
+                positions[i * 3] += velocities[i].x;
+                positions[i * 3 + 1] += velocities[i].y;
+                positions[i * 3 + 2] += velocities[i].z;
+
+                // Pull back to original position
+                const dx = originalPositions[i].x - positions[i * 3];
+                const dy = originalPositions[i].y - positions[i * 3 + 1];
+                const dz = originalPositions[i].z - positions[i * 3 + 2];
+
+                velocities[i].x += dx * 0.02;
+                velocities[i].y += dy * 0.02;
+                velocities[i].z += dz * 0.02;
+
+                // Damping
+                velocities[i].x *= 0.95;
+                velocities[i].y *= 0.95;
+                velocities[i].z *= 0.95;
+
+                // Add wave motion
+                positions[i * 3] += Math.sin(time + i * 0.1) * 0.01;
+                positions[i * 3 + 2] += Math.cos(time + i * 0.1) * 0.01;
+            }
+
+            particles.attributes.position.needsUpdate = true;
+
+            // Decay interaction force
+            interactionForce *= 0.95;
+            rotationSpeed = 0.002 + interactionForce * 0.0005;
+
+            // Animate star
+            star.rotation.y += 0.02;
+            star.scale.setScalar(1 + Math.sin(time * 2) * 0.1);
+
+            // Update text particles
+            for (let i = textParticles.length - 1; i >= 0; i--) {
+                const tp = textParticles[i];
+
+                // Apply velocity
+                tp.sprite.position.add(tp.velocity);
+
+                // Apply gravity and drag
+                tp.velocity.y -= 0.01;
+                tp.velocity.multiplyScalar(0.98);
+
+                // Fade out
+                tp.life -= 0.01;
+                tp.sprite.material.opacity = tp.life;
+
+                // Remove dead particles
+                if (tp.life <= 0) {
+                    scene.remove(tp.sprite);
+                    tp.sprite.material.map.dispose();
+                    tp.sprite.material.dispose();
+                    textParticles.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
